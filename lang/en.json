@@ -61,6 +61,8 @@
       "ShowHPBarToPlayersHint": "If enabled, players will see HP bars on combatant cards.",
       "ShowActionDropdownName": "Show Action Dropdown",
       "ShowActionDropdownHint": "Show the declared action dropdown on owned combatants.",
+      "ForceActionReselectName": "Require action re-selection each round",
+      "ForceActionReselectHint": "When enabled, declared actions reset each round so players must choose again. When disabled (default), Fantastic Depths sets defaults from equipped weapons (attack/fire), including on later rounds.",
       "DebugModeName": "Enable DEBUG console",
       "DebugModeHint": "Prints detailed information to the browser console (F12). Useful for reporting bugs to the developer."
     }

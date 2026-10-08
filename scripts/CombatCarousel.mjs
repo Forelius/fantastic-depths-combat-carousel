@@ -1,4 +1,5 @@
 import { CombatantCard } from './CombatantCard.mjs';
+import { forceActionReselect } from './settings.mjs';
 
 const MODULE_ID = 'fantastic-depths-combat-carousel';
 
@@ -1734,9 +1735,8 @@ export class CombatCarousel {
       
       _log(`preUpdateActor | ${actor.name} | newAction=${newAction} | currentAction=${currentAction} | from=${user?.name} | inPending=${inPending} | _roundChanging=${this._roundChanging}`);
       
-      // BLOCK: During round change, prevent FaDe from auto-setting attack/fire
-      // This happens when FaDe's roundReset sets default weapon action
-      if (this._roundChanging && inPending === true && (newAction === 'attack' || newAction === 'fire')) {
+      // BLOCK: When forcing re-selection, prevent FaDe from auto-setting attack/fire during round change
+      if (forceActionReselect() && this._roundChanging && inPending === true && (newAction === 'attack' || newAction === 'fire')) {
         _warn(`preUpdateActor | BLOCKED | ${actor.name} | FaDe auto-${newAction} prevented during round change`);
         return false; // Block the update
       }
@@ -1886,13 +1886,14 @@ export class CombatCarousel {
         this._playRoundSound();
         let nextRound = 'reset';
         try { nextRound = game.settings.get(game.system.id, 'nextRound') ?? 'reset'; } catch(e) {}
-        _log(`══ ROUND ${updates.round} ══ | mode=${this.initiativeMode} | nextRound=${nextRound} | isGM=${game.user.isGM}`);
+        const requireReselect = forceActionReselect();
+        _log(`══ ROUND ${updates.round} ══ | mode=${this.initiativeMode} | nextRound=${nextRound} | isGM=${game.user.isGM} | forceActionReselect=${requireReselect}`);
         this._pendingTieRerolls.clear();
         this._npcActions.clear(); // Clear shadow state from previous round
         this._autoRolledRound = null;
         this._autoRolling = false;
         this._initiativeClearing = false;
-        this._roundChanging = true;
+        if (requireReselect) this._roundChanging = true;
         
         // Clear waiting flags for all combatants at round start
         if (game.user.isGM) {
@@ -1902,7 +1903,7 @@ export class CombatCarousel {
         }
         // _roundChanging will be cleared by the deferred setTimeout below (non-GM) or by main.mjs patch (GM)
         // Non-GM clients populate _resetPendingIds here (GM already did it in main.mjs nextRound patch)
-        if (!game.user.isGM && (nextRound === 'reroll' || nextRound === 'reset' || nextRound === 'hold')) {
+        if (requireReselect && !game.user.isGM && (nextRound === 'reroll' || nextRound === 'reset' || nextRound === 'hold')) {
           // CRITICAL FIX: Only include combatants who haven't chosen an action yet
           // This prevents race condition where socket action events arrive before updateCombat
           const pendingIds = new Set();
@@ -1927,7 +1928,7 @@ export class CombatCarousel {
         // force immediate refresh with all combatants marked as pending so declaredActions show "Seleziona..." (yellow)
         // This applies to individual modes AND group modes
         _log(`updateCombat | GM CHECK | mode=${this.initiativeMode} | isGroup=${this.isGroupMode} | nextRound=${nextRound}`);
-        if (game.user.isGM && (this.initiativeMode === 'individual' || this.initiativeMode === 'individualChecklist' || this.initiativeMode === 'simpleIndividual' || this.isGroupMode) && (nextRound === 'reroll' || nextRound === 'reset' || nextRound === 'hold')) {
+        if (requireReselect && game.user.isGM && (this.initiativeMode === 'individual' || this.initiativeMode === 'individualChecklist' || this.initiativeMode === 'simpleIndividual' || this.isGroupMode) && (nextRound === 'reroll' || nextRound === 'reset' || nextRound === 'hold')) {
           this._resetPendingIds = new Set(Array.from(this.combat.combatants).map(c => c.id));
           _log(`updateCombat | GM _resetPendingIds (${this._resetPendingIds.size}) | mode=${this.initiativeMode}`);
           // Immediate refresh to show "Seleziona..." (yellow borders) before actor updates propagate
@@ -1938,6 +1939,9 @@ export class CombatCarousel {
             _log(`updateCombat | GM deferred refresh after round change | mode=${this.initiativeMode}`);
             this.refreshCards();
           }, 1500);
+        } else if (!requireReselect) {
+          this._roundChanging = false;
+          this._resetPendingIds?.clear();
         }
         // For individual modes: fix turn=0 so no card appears "active" at start of new round
         if ((this.initiativeMode === 'individual' || this.initiativeMode === 'individualChecklist' || this.initiativeMode === 'simpleIndividual') && game.user.isGM) {

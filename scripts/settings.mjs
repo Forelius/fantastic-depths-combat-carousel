@@ -42,6 +42,15 @@ export function registerSettings() {
     default: true
   });
 
+  game.settings.register(MODULE_ID, 'forceActionReselect', {
+    name: 'FDCC.Settings.ForceActionReselectName',
+    hint: 'FDCC.Settings.ForceActionReselectHint',
+    scope: 'world',
+    config: true,
+    type: Boolean,
+    default: false
+  });
+
   game.settings.register(MODULE_ID, 'debugMode', {
     name: 'FDCC.Settings.DebugModeName',
     hint: 'FDCC.Settings.DebugModeHint',
@@ -50,4 +59,9 @@ export function registerSettings() {
     type: Boolean,
     default: false
   });
+}
+
+/** When true, each new round clears actions to force re-declaration. Default false = FaDe weapon defaults. */
+export function forceActionReselect() {
+  try { return game.settings.get(MODULE_ID, 'forceActionReselect') === true; } catch (e) { return false; }
 }

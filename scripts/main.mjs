@@ -1,5 +1,5 @@
 import { CombatCarousel } from './CombatCarousel.mjs';
-import { registerSettings } from './settings.mjs';
+import { registerSettings, forceActionReselect } from './settings.mjs';
 
 export const MODULE_ID = 'fantastic-depths-combat-carousel';
 
@@ -42,12 +42,13 @@ Hooks.once('ready', () => {
       let choseNothing = false;
       let nextRound = 'reset';
       try { nextRound = game.settings.get(game.system.id, 'nextRound') ?? 'reset'; } catch(e) {}
-      _log(`roundReset | ${this.name} | deleteAction=${deleteAction} | nextRound=${nextRound}`);
-      if (carousel && !deleteAction) {
+      // Override FaDe defaults only when the world setting requires re-selection AND
+      // we are in a next-round change (_roundChanging). Combat start always uses FaDe defaults.
+      const overrideForReselect = carousel && !deleteAction && carousel._roundChanging && forceActionReselect();
+      _log(`roundReset | ${this.name} | deleteAction=${deleteAction} | nextRound=${nextRound} | override=${!!overrideForReselect}`);
+      if (overrideForReselect) {
         savedAction = this.actor?.system?.combat?.declaredAction ?? null;
         choseNothing = this.getFlag('fantastic-depths-combat-carousel', 'choseNothing') ?? false;
-      }
-      if (carousel && !deleteAction) {
         if (nextRound === 'hold') {
           // hold: call origRoundReset normally then restore the saved action
           await origRoundReset.call(this, false);
@@ -58,18 +59,15 @@ Hooks.once('ready', () => {
             ]);
           } else if (savedAction && savedAction !== 'nothing') {
             await this.actor?.update({ 'system.combat.declaredAction': savedAction });
-          } else {
           }
         } else {
-          // reset/reroll: BYPASS FaDe's roundReset completely - we handle the reset ourselves
-          // This prevents FaDe from setting "attack"/"fire" and ensures actions are truly reset
+          // reset/reroll: BYPASS FaDe's roundReset — force re-selection
+          // 'nothing' displays as "Select..." (yellow); null gets auto-converted to "attack"
           if (choseNothing) await this.unsetFlag('fantastic-depths-combat-carousel', 'choseNothing');
-          // Do NOT call origRoundReset - force 'nothing' (FaDe's special value for no-action)
-          // 'nothing' displays as "Select..." (yellow), while null gets auto-converted to "attack"
           await this.actor?.update({ 'system.combat.declaredAction': 'nothing' });
         }
       } else {
-        // Called with deleteAction=true directly (not via our patch logic)
+        // Combat start, exit, or carousel inactive: use FaDe defaults (attack/fire)
         await origRoundReset.call(this, deleteAction);
       }
     };
@@ -87,17 +85,20 @@ Hooks.once('ready', () => {
       const isReroll = this.nextRoundMode === 'reroll';
       const isReset = this.nextRoundMode === 'reset';
       const isHold = this.nextRoundMode === 'hold';
+      const requireReselect = forceActionReselect();
       if (carousel && (isReroll || isReset || isHold)) {
-        _log(`nextRound PATCH | isReroll=${isReroll} isReset=${isReset} isHold=${isHold}`);
-        // Mark all combatants as "pending re-selection" so the carousel shows yellow
-        carousel._resetPendingIds = new Set(Array.from(this.combatants).map(c => c.id));
-        // Block updateActor hook from removing combatants during FaDe's roundReset calls
-        carousel._roundChanging = true;
+        _log(`nextRound PATCH | isReroll=${isReroll} isReset=${isReset} isHold=${isHold} | forceActionReselect=${requireReselect}`);
         // Clear any pending tie rerolls from the previous round so deferred _fixTurnToHighestInit
         // callbacks (still in setTimeout queues) abort immediately and don't fire combat.update
         carousel._pendingTieRerolls?.clear();
-        // IMMEDIATE REFRESH: Show "Seleziona..." (yellow borders) right away before actor updates propagate
-        carousel.refreshCards();
+        if (requireReselect) {
+          // Mark all combatants as "pending re-selection" so the carousel shows yellow
+          carousel._resetPendingIds = new Set(Array.from(this.combatants).map(c => c.id));
+          // Block updateActor hook from removing combatants during FaDe's roundReset calls
+          carousel._roundChanging = true;
+          // IMMEDIATE REFRESH: Show "Seleziona..." (yellow borders) right away before actor updates propagate
+          carousel.refreshCards();
+        }
       }
       let result;
       // Note: roundReset patch calls origRoundReset(true) for reset/reroll → FaDe writes null directly
@@ -112,12 +113,13 @@ Hooks.once('ready', () => {
         result = await origNextRound.call(this);
       }
       if (carousel && (isReroll || isReset || isHold)) {
-        // Keep _roundResetting=true until the carousel detects all actions selected.
-        // It will be cleared by _autoRollIfReady or by setupCombatants when actions are chosen.
-        // Do a deferred refresh so the UI shows yellow cards.
+        // Keep _roundChanging until reselection settles (only when forcing re-select).
+        // Do a deferred refresh so the UI catches FaDe defaults or yellow pending cards.
         setTimeout(() => {
           carousel._roundChanging = false;
           carousel.refreshCards();
+          // With FaDe defaults, attack/fire may be a no-op update — nudge auto-roll for reroll mode
+          if (!requireReselect && isReroll) carousel._autoRollIfReady();
           // In individual modes, always reset turn to highest initiative after round change
           // This is needed for hold mode where initiatives don't change but turn must reset
           if ((carousel.initiativeMode === 'individualChecklist' || carousel.initiativeMode === 'simpleIndividual') && game.user.isGM) {

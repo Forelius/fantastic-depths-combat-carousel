@@ -60,6 +60,8 @@
       "ShowHPBarToPlayersHint": "",
       "ShowActionDropdownName": "Mostra Azione Dichiarata",
       "ShowActionDropdownHint": "",
+      "ForceActionReselectName": "Richiedi nuova selezione azione ogni round",
+      "ForceActionReselectHint": "Se attivo, le azioni dichiarate si azzerano a ogni round e vanno scelte di nuovo. Se disattivo (predefinito), Fantastic Depths imposta i default dall'arma equipaggiata (attacco/tiro), anche nei round successivi.",
       "DebugModeName": "Abilita console DEBUG",
       "DebugModeHint": "Stampa informazioni dettagliate nella console del browser (F12). Utile per segnalare bug allo sviluppatore."
     }
