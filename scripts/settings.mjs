@@ -8,7 +8,7 @@ export function registerSettings() {
     config: true,
     type: Number,
     default: 80,
-    range: { min: 80, max: 150, step: 5 },
+    range: { min: 60, max: 150, step: 5 },
     onChange: (value) => {
       const panel = document.getElementById('combat-carousel-panel');
       if (panel) panel.style.setProperty('--portrait-size', `${value}px`);

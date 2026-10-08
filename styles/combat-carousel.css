@@ -1,11 +1,14 @@
 /* Fantastic Depths Combat Carousel - Styles */
 
-/* Override: #ui-top has pointer-events:none in Foundry v14 */
-#ui-top #combat-carousel-panel {
-  pointer-events: all;
+/* Pass through empty panel space; only interactive children capture events.
+   #ui-top itself is pointer-events:none in Foundry v14. */
+#combat-carousel-panel {
+  pointer-events: none;
 }
 
-#ui-top #combat-carousel-panel * {
+#combat-carousel-panel .carousel-combatants,
+#combat-carousel-panel .carousel-controls,
+#combat-carousel-panel .carousel-round-indicator {
   pointer-events: auto;
 }
 
@@ -22,7 +25,6 @@
   box-sizing: border-box;
   z-index: 100;
   position: relative;
-  pointer-events: all;
   overflow: visible;
   min-height: fit-content;
 }
