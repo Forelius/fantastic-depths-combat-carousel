@@ -18,3 +18,4 @@ backups/
 docs/
 *.bak
 deploy.ps1
+/.vs

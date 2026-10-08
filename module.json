@@ -17,11 +17,7 @@
     "systems": [
       {
         "id": "fantastic-depths",
-        "type": "system",
-        "compatibility": {
-          "minimum": "1.0.13",
-          "verified": "1.2.8"
-        }
+        "type": "system"        
       }
     ]
   },
