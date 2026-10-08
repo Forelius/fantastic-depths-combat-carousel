@@ -618,12 +618,27 @@ Hooks.on('updateActor', (actor, changes) => {
   // declaredAction changes: handled by CombatCarousel._setHooks updateActor handler
 });
 
-Hooks.on('updateItem', (item, changes) => {
-  if (!ui.combatCarousel?.rendered) return;
-  // If equipped status or isSlow changed on a weapon, refresh cards (slow icon may change)
-  if (item.type === 'weapon' && (changes.system?.equipped !== undefined || changes.system?.isSlow !== undefined)) {
-    ui.combatCarousel.refreshCards();
-  }
+/** True if the item belongs to an actor currently in the carousel combat. */
+function _itemBelongsToCarouselCombatant(item) {
+  const carousel = ui.combatCarousel;
+  if (!carousel?.rendered || !carousel.combat) return false;
+  const actor = item?.actor ?? item?.parent;
+  if (!actor || actor.documentName !== 'Actor') return false;
+  return carousel.combat.combatants.some(c => c.actor?.id === actor.id);
+}
+
+// Match FaDe PlayerCombatForm: any item change on a combatant can alter available actions
+// (equipped weapons, ammo, memorized spells, special-ability maneuvers, etc.).
+Hooks.on('updateItem', (item) => {
+  if (_itemBelongsToCarouselCombatant(item)) ui.combatCarousel.refreshCards();
+});
+
+Hooks.on('createItem', (item) => {
+  if (_itemBelongsToCarouselCombatant(item)) ui.combatCarousel.refreshCards();
+});
+
+Hooks.on('deleteItem', (item) => {
+  if (_itemBelongsToCarouselCombatant(item)) ui.combatCarousel.refreshCards();
 });
 
 Hooks.on('hoverToken', (token, hover) => {
